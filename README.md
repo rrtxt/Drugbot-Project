@@ -22,7 +22,7 @@ Before running the project, ensure that you have the following installed on your
 
 ```bash
 drugbot/
-├── project                 # Docker-compose.yml, chroma_data, etc
+├── drugbot-project         # Docker-compose.yml, chroma_data, etc
 ├── drugbot-backend         # Flask API of drugbot
 ├── drugbot-frontend        # Frontend of drugbot
 ├── drugbot-dataset         # Dataset used in drugbot
@@ -34,8 +34,13 @@ drugbot/
 Clone the repository and navigate to the project directory:
 
 ```bash
-git clone https://github.com/rrtxt/Drugbot.git
-cd drugbot
+mkdir drugbot
+git clone https://github.com/rrtxt/Drugbot-Project.git
+git clone https://github.com/rrtxt/Drugbot-Frontend.git
+git clone https://github.com/rrtxt/Drugbot-Backend.git
+git clone https://github.com/rrtxt/Drugbot-Admin.git
+git clone https://github.com/rrtxt/Drugbot-Dataset.git
+cd Drugbot-Project
 ```
 
 ## Docker Commands

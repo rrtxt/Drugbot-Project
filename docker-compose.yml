@@ -1,0 +1,133 @@
+version: "3"
+
+services:
+  frontend:
+    build:
+      context: ../drugbot-frontend
+      dockerfile: ../drugbot-frontend/Dockerfile
+      target: ${environment}
+      args:
+        - NEXT_PUBLIC_BACKEND_URL=http://backend:5000
+    ports:
+      - 3000:3000
+    environment:
+      - NEXT_PUBLIC_BACKEND_URL=http://backend:5000
+    depends_on:
+      - backend
+    networks:
+      - public-network
+      - backend-network
+    restart: always
+
+  backend:
+    build:
+      context: ../drugbot-backend
+      dockerfile: ../drugbot-backend/Dockerfile
+    volumes:
+      - ../drugbot-backend/model_cache:/app/model_cache
+    ports:
+      - 5000:5000
+    environment:
+      - FLASK_APP=run.py
+      - FLASK_ENV=${environment}
+      - HF_HOME=/app/model_cache
+      - MODEL_CACHE=/app/model_cache
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - MONGODB_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017
+      - MONGODB_DB=drugbot
+      - HF_TOKEN=${HF_TOKEN}
+    depends_on:
+      chromadb:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - public-network
+      - backend-network
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 1.1.1.1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  admin:
+    build:
+      context: ../drugbot-admin
+      dockerfile: ../drugbot-admin/Dockerfile
+      target: ${environment}
+      args:
+        - CHROMA_URL=http://chromadb:8000
+    ports:
+      - 8080:8080
+    environment:
+      - CHROMA_URL=http://chromadb:8000
+    depends_on:
+      chromadb:
+        condition: service_healthy
+    networks:
+      - public-network
+      - backend-network
+    restart: always
+
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - 27017:27017
+    volumes:
+      - ./mongo_data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+    networks:
+      - backend-network
+    restart: unless-stopped
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  chromadb:
+    image: ghcr.io/chroma-core/chroma:latest
+    container_name: chromadb
+    ports:
+      - 8000:8000
+    volumes:
+      - ./chroma_data:/chroma/chroma
+    environment:
+      - CHROMA_SERVER_CORS_ALLOW_ORIGINS=["*"]
+    networks:
+      - backend-network
+    restart: unless-stopped
+    healthcheck:
+      test:
+        ["CMD", "/bin/bash", "-c", "cat < /dev/null > /dev/tcp/localhost/8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  chroma_data:
+    driver: local
+  mongo_data:
+    driver: local
+  model_cache:
+    driver: local
+
+networks:
+  public-network:
+    driver: bridge
+  backend-network:
+    driver: bridge
+    # internal: true

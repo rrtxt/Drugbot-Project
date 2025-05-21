@@ -3,8 +3,8 @@ version: "3"
 services:
   frontend:
     build:
-      context: ../drugbot-frontend
-      dockerfile: ../drugbot-frontend/Dockerfile
+      context: ../Drugbot-Frontend
+      dockerfile: ../Drugbot-Frontend/Dockerfile
       target: ${environment}
       args:
         - NEXT_PUBLIC_BACKEND_URL=http://backend:5000
@@ -12,6 +12,8 @@ services:
       - 3000:3000
     environment:
       - NEXT_PUBLIC_BACKEND_URL=http://backend:5000
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
     depends_on:
       - backend
     networks:
@@ -21,10 +23,10 @@ services:
 
   backend:
     build:
-      context: ../drugbot-backend
-      dockerfile: ../drugbot-backend/Dockerfile
+      context: ../Drugbot-Backend
+      dockerfile: ../Drugbot-Backend/Dockerfile
     volumes:
-      - ../drugbot-backend/model_cache:/app/model_cache
+      - ../Drugbot-Backend/model_cache:/app/model_cache
     ports:
       - 5000:5000
     environment:
@@ -60,8 +62,8 @@ services:
 
   admin:
     build:
-      context: ../drugbot-admin
-      dockerfile: ../drugbot-admin/Dockerfile
+      context: ../Drugbot-Admin
+      dockerfile: ../Drugbot-Admin/Dockerfile
       target: ${environment}
       args:
         - CHROMA_URL=http://chromadb:8000
@@ -87,15 +89,15 @@ services:
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+      - MONGO_INITDB_DATABASE=drugbot
+    command: mongod --auth
     networks:
+      - public-network
       - backend-network
     restart: unless-stopped
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      test: mongosh --norc --host localhost --port 27017 --username "${MONGO_INITDB_ROOT_USERNAME}" --password "${MONGO_INITDB_ROOT_PASSWORD}" --authenticationDatabase admin --eval 'db.adminCommand("ping")' --quiet
       interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
 
   chromadb:
     image: ghcr.io/chroma-core/chroma:latest
@@ -103,8 +105,10 @@ services:
     ports:
       - 8000:8000
     volumes:
-      - ./chroma_data:/chroma/chroma
+      - ./chroma_data:/data
     environment:
+      - IS_PERSISTENT=true
+      - PERSIST_DIRECTORY=/data
       - CHROMA_SERVER_CORS_ALLOW_ORIGINS=["*"]
     networks:
       - backend-network

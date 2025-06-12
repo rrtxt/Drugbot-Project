@@ -1,5 +1,3 @@
-version: "3"
-
 services:
   frontend:
     build:
@@ -98,6 +96,9 @@ services:
     healthcheck:
       test: mongosh --norc --host localhost --port 27017 --username "${MONGO_INITDB_ROOT_USERNAME}" --password "${MONGO_INITDB_ROOT_PASSWORD}" --authenticationDatabase admin --eval 'db.adminCommand("ping")' --quiet
       interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   chromadb:
     image: ghcr.io/chroma-core/chroma:latest
@@ -110,9 +111,18 @@ services:
       - IS_PERSISTENT=true
       - PERSIST_DIRECTORY=/data
       - CHROMA_SERVER_CORS_ALLOW_ORIGINS=["*"]
+      - RUST_BACKTRACE=full
     networks:
       - backend-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
     healthcheck:
       test:
         ["CMD", "/bin/bash", "-c", "cat < /dev/null > /dev/tcp/localhost/8000"]
